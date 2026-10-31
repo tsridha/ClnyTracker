@@ -3,914 +3,758 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Colony Security Guard Maintenance Tracker</title>
+    <title>Colony Security & Maintenance Tracker</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Font (Inter) -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
         @media print {
+            body * { visibility: hidden; }
+            #receiptModal, #receiptModal * { visibility: visible; }
+            #receiptModal { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
             .no-print { display: none !important; }
-            .print-only { display: block !important; }
         }
-        .print-only { display: none; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
 
-    <!-- Top Navigation Bar -->
-    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-30 no-print">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="bg-white/10 p-2 rounded-lg">
-                    <i class="fa-solid fa-shield-halved text-2xl text-amber-300"></i>
-                </div>
+    <!-- PASSWORD GATE / LOCK SCREEN -->
+    <div id="accessLockScreen" class="fixed inset-0 bg-slate-900 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-md text-center space-y-6">
+            <div class="inline-flex p-4 bg-indigo-100 text-indigo-700 rounded-full">
+                <i data-lucide="lock" class="w-10 h-10"></i>
+            </div>
+            
+            <div class="space-y-2">
+                <h2 class="text-2xl font-bold text-slate-800">Colony Resident Access</h2>
+                <p class="text-sm text-slate-500">Please enter your colony's secret passcode to view the maintenance and security tracker.</p>
+            </div>
+
+            <form onsubmit="verifyAccessPasscode(event)" class="space-y-4">
                 <div>
-                    <h1 class="font-bold text-lg sm:text-xl leading-tight">Greenwood Heights</h1>
-                    <p class="text-xs text-indigo-200">Security & Maintenance Tracker</p>
+                    <input type="password" id="inputPasscode" required placeholder="Enter Colony Passcode" class="w-full text-center px-4 py-3 border border-slate-300 rounded-xl font-mono text-lg tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <p id="passcodeError" class="text-xs text-rose-600 font-medium mt-2 hidden">Incorrect passcode. Please ask your colony committee.</p>
                 </div>
-            </div>
-
-            <!-- Mode Switcher -->
-            <div class="flex items-center space-x-3">
-                <span id="roleBadge" class="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-500 text-white flex items-center gap-1">
-                    <i class="fa-solid fa-eye text-[10px]"></i> Resident View
-                </span>
-                <button id="toggleAdminBtn" onclick="handleRoleToggle()" class="bg-indigo-600 hover:bg-indigo-800 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1.5 border border-indigo-400/30 shadow-sm">
-                    <i class="fa-solid fa-lock text-amber-300"></i>
-                    <span id="adminBtnText">Admin Login</span>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition shadow-md">
+                    Unlock Dashboard
                 </button>
-            </div>
+            </form>
+
+            <p class="text-xs text-slate-400">Restricted access for resident group members only.</p>
         </div>
-    </header>
+    </div>
 
-    <!-- Main Container -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <!-- MAIN APP WRAPPER (Hidden until unlocked) -->
+    <div id="appContainer" class="hidden flex-1 flex flex-col">
 
-        <!-- Controls & Filter Toolbar -->
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
-            <!-- Month Picker -->
-            <div class="flex items-center space-x-3">
-                <label for="monthPicker" class="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
-                    <i class="fa-regular fa-calendar-days text-indigo-600"></i> Month:
-                </label>
-                <input type="month" id="monthPicker" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50">
-            </div>
-
-            <!-- Search & Actions -->
-            <div class="flex flex-wrap items-center gap-2">
-                <div class="relative flex-1 sm:w-64">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
-                    <input type="text" id="searchInput" placeholder="Search House No or Owner..." oninput="renderApp()" class="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        <!-- Header Navigation -->
+        <header class="bg-indigo-900 text-white shadow-lg no-print">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-indigo-700 rounded-lg">
+                        <i data-lucide="shield-check" class="w-7 h-7 text-emerald-400"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold tracking-tight">Colony Security Tracker</h1>
+                        <p class="text-xs text-indigo-200">Monthly Maintenance & Guard Salary Management</p>
+                    </div>
                 </div>
                 
-                <button onclick="exportToCSV()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center space-x-1.5">
-                    <i class="fa-solid fa-file-excel text-emerald-600"></i>
-                    <span>Export Excel</span>
-                </button>
+                <div class="flex items-center gap-4">
+                    <!-- Mode Badge -->
+                    <div id="modeStatus" class="flex items-center gap-2 bg-indigo-950 px-3 py-1.5 rounded-full border border-indigo-700">
+                        <span id="roleBadge" class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                        <span id="roleLabel" class="text-xs font-semibold uppercase tracking-wider text-indigo-200">Resident View</span>
+                    </div>
+                    
+                    <button id="toggleAdminBtn" onclick="handleAdminAuthToggle()" class="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-medium text-sm px-4 py-1.5 rounded-lg transition shadow-sm">
+                        <i data-lucide="lock" class="w-4 h-4"></i>
+                        <span id="adminBtnText">Admin Login</span>
+                    </button>
 
-                <button id="configBtn" onclick="openConfigModal()" class="admin-only hidden bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-sm font-medium transition flex items-center space-x-1.5">
-                    <i class="fa-solid fa-gear"></i>
-                    <span>Setup Colony</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Dashboard Financial Summary Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <!-- Total Target -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-                    <span>Target Collection</span>
-                    <i class="fa-solid fa-bullseye text-indigo-500"></i>
-                </div>
-                <div id="cardTarget" class="text-xl font-bold text-slate-800">₹0</div>
-                <div id="cardTotalHouses" class="text-[11px] text-slate-500 mt-1">For 0 registered houses</div>
-            </div>
-
-            <!-- Collected -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-                    <span>Total Collected</span>
-                    <i class="fa-solid fa-wallet text-emerald-500"></i>
-                </div>
-                <div id="cardCollected" class="text-xl font-bold text-emerald-600">₹0</div>
-                <div class="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
-                    <div id="progressBar" class="bg-emerald-500 h-full rounded-full" style="width: 0%"></div>
+                    <button onclick="lockApp()" class="text-slate-300 hover:text-white p-1.5 rounded-lg transition" title="Lock Dashboard">
+                        <i data-lucide="log-out" class="w-5 h-5"></i>
+                    </button>
                 </div>
             </div>
+        </header>
 
-            <!-- Defaulters / Pending -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-                    <span>Pending Defaulters</span>
-                    <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
-                </div>
-                <div id="cardUnpaidCount" class="text-xl font-bold text-amber-600">0 Houses</div>
-                <div id="cardPendingAmount" class="text-[11px] text-amber-700 mt-1">₹0 overdue</div>
-            </div>
-
-            <!-- Guard Salary Payout -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-                    <span>Guard Salary Payout</span>
-                    <i class="fa-solid fa-user-shield text-blue-500"></i>
-                </div>
-                <div id="cardGuardStatus" class="flex items-center gap-1.5 mt-0.5">
-                    <span class="text-lg font-bold text-slate-700">Pending</span>
-                </div>
-                <button onclick="openGuardModal()" class="mt-1 text-xs text-indigo-600 hover:underline font-medium flex items-center gap-1">
-                    <i class="fa-solid fa-circle-info text-[10px]"></i> Manage Guard & Payout
-                </button>
-            </div>
-
-            <!-- Net Surplus / Balance -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                <div class="flex items-center justify-between text-slate-500 text-xs font-medium mb-1">
-                    <span>Net Colony Balance</span>
-                    <i class="fa-solid fa-scale-balanced text-indigo-500"></i>
-                </div>
-                <div id="cardNetBalance" class="text-xl font-bold text-indigo-700">₹0</div>
-                <div class="text-[11px] text-slate-400 mt-1">Collected minus Salary</div>
-            </div>
-        </div>
-
-        <!-- Filter Tabs & Main Content -->
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <!-- Filter Bar -->
-            <div class="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3 no-print">
-                <div class="flex items-center space-x-1 bg-slate-200/70 p-1 rounded-lg text-xs font-medium">
-                    <button onclick="setFilter('all')" id="tabAll" class="filter-tab px-3 py-1.5 rounded-md transition shadow-sm bg-white text-indigo-700">All Houses</button>
-                    <button onclick="setFilter('paid')" id="tabPaid" class="filter-tab px-3 py-1.5 rounded-md transition text-slate-600 hover:text-slate-900">Paid</button>
-                    <button onclick="setFilter('unpaid')" id="tabUnpaid" class="filter-tab px-3 py-1.5 rounded-md transition text-slate-600 hover:text-slate-900">Unpaid / Defaulters</button>
+        <!-- Main Content Area -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+            
+            <!-- Controls & Filters Bar -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                <!-- Date / Month Picker -->
+                <div class="flex items-center gap-3 w-full md:w-auto">
+                    <label for="monthPicker" class="text-sm font-semibold text-slate-600 flex items-center gap-1.5">
+                        <i data-lucide="calendar" class="w-4 h-4 text-indigo-600"></i> Select Month:
+                    </label>
+                    <input type="month" id="monthPicker" onchange="changeMonth()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                 </div>
 
-                <div class="flex items-center space-x-2">
-                    <button id="addHouseBtn" onclick="openHouseModal()" class="admin-only hidden bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center space-x-1">
-                        <i class="fa-solid fa-plus"></i>
-                        <span>Add New House</span>
+                <!-- Tab Navigation -->
+                <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200 w-full md:w-auto overflow-x-auto">
+                    <button onclick="switchTab('contributions')" id="tab-contributions" class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-slate-700 bg-white shadow-sm">
+                        Contributions
+                    </button>
+                    <button onclick="switchTab('guards')" id="tab-guards" class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-slate-500 hover:text-slate-700">
+                        Guard Salary Payouts
+                    </button>
+                    <button onclick="switchTab('houses')" id="tab-houses" class="tab-btn px-4 py-1.5 text-sm font-medium rounded-md transition text-slate-500 hover:text-slate-700">
+                        Manage Houses
                     </button>
                 </div>
             </div>
 
-            <!-- Table for Desktop -->
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-slate-100/80 text-slate-600 text-xs uppercase font-semibold border-b border-slate-200">
-                        <tr>
-                            <th class="py-3 px-4">House No</th>
-                            <th class="py-3 px-4">Owner Name</th>
-                            <th class="py-3 px-4">Contact</th>
-                            <th class="py-3 px-4">Status</th>
-                            <th class="py-3 px-4">Amount Paid</th>
-                            <th class="py-3 px-4">Payment Date</th>
-                            <th class="py-3 px-4 text-right no-print">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="houseTableBody" class="divide-y divide-slate-100">
-                        <!-- Dynamic Content Rendered Here -->
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Empty State -->
-            <div id="emptyState" class="hidden py-12 text-center text-slate-400">
-                <i class="fa-regular fa-folder-open text-4xl mb-2"></i>
-                <p class="text-sm font-medium">No matching house records found.</p>
-            </div>
-        </div>
-
-    </main>
-
-    <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 mt-auto py-4 text-center text-xs text-slate-500 no-print">
-        <p>© Greenwood Heights Security & Maintenance Management System</p>
-    </footer>
-
-    <!-- MODAL: PIN Prompt for Admin -->
-    <div id="pinModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center space-y-4">
-            <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto text-xl">
-                <i class="fa-solid fa-key"></i>
-            </div>
-            <div>
-                <h3 class="font-bold text-slate-800 text-lg">Admin Access PIN</h3>
-                <p class="text-xs text-slate-500 mt-1">Default PIN is <strong>1234</strong></p>
-            </div>
-            <input type="password" id="pinInput" maxlength="6" placeholder="Enter PIN" class="w-full text-center text-2xl tracking-widest border border-slate-300 rounded-lg py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-            <div class="flex space-x-2">
-                <button onclick="closePinModal()" class="w-1/2 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 rounded-lg text-sm font-medium">Cancel</button>
-                <button onclick="verifyPin()" class="w-1/2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium">Submit</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL: House Setup & Colony Settings (Admin) -->
-    <div id="configModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
-            <div class="flex items-center justify-between border-b pb-3">
-                <h3 class="font-bold text-slate-800 text-lg">Colony Configuration</h3>
-                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <form id="configForm" onsubmit="saveConfig(event)" class="space-y-3">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Colony Name</label>
-                    <input type="text" id="cfgColonyName" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Default Monthly Contribution (₹)</label>
-                    <input type="number" id="cfgDefaultAmount" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Security Guard Monthly Salary (₹)</label>
-                    <input type="number" id="cfgGuardSalary" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Admin Security PIN</label>
-                    <input type="password" id="cfgAdminPin" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" required>
-                </div>
-                <div class="pt-2 flex justify-end space-x-2">
-                    <button type="button" onclick="closeConfigModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium">Cancel</button>
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Save Settings</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL: Add / Edit House Record -->
-    <div id="houseModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
-            <div class="flex items-center justify-between border-b pb-3">
-                <h3 id="houseModalTitle" class="font-bold text-slate-800 text-lg">Add New House</h3>
-                <button onclick="closeHouseModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <form id="houseForm" onsubmit="saveHouse(event)" class="space-y-3">
-                <input type="hidden" id="editingHouseId">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">House Number (Alphanumeric)</label>
-                    <input type="text" id="houseNoInput" placeholder="e.g. A-101, B-202" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Owner / Resident Name</label>
-                    <input type="text" id="ownerNameInput" placeholder="e.g. Rajesh Sharma" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Contact Phone Number</label>
-                    <input type="tel" id="contactInput" placeholder="e.g. 9876543210" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                </div>
-                <div class="pt-2 flex justify-between items-center">
-                    <button type="button" id="deleteHouseBtn" onclick="deleteHouse()" class="hidden bg-red-50 hover:bg-red-100 text-red-600 px-3 py-2 rounded-lg text-sm font-medium border border-red-200">Delete</button>
-                    <div class="flex space-x-2 ml-auto">
-                        <button type="button" onclick="closeHouseModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium">Cancel</button>
-                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Save House</button>
+            <!-- Dashboard Financial Summary Cards -->
+            <div id="summaryCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Total Collected Card -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Collection</p>
+                        <h3 id="statTotalCollected" class="text-2xl font-bold text-slate-800 mt-1">₹0</h3>
+                        <p id="statPaidCount" class="text-xs text-emerald-600 font-medium mt-1">0 Houses Paid</p>
+                    </div>
+                    <div class="p-3 bg-emerald-50 rounded-xl text-emerald-600">
+                        <i data-lucide="indian-rupee" class="w-6 h-6"></i>
                     </div>
                 </div>
-            </form>
-        </div>
-    </div>
 
-    <!-- MODAL: Mark Payment Modal (Admin) -->
-    <div id="paymentModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4">
-            <div class="flex items-center justify-between border-b pb-3">
-                <div>
-                    <h3 class="font-bold text-slate-800 text-lg">Update Payment</h3>
-                    <p id="paymentSubTitle" class="text-xs text-slate-500">House A-101</p>
-                </div>
-                <button onclick="closePaymentModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-            <form id="paymentForm" onsubmit="savePayment(event)" class="space-y-3">
-                <input type="hidden" id="payHouseId">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Contribution Amount (₹)</label>
-                    <input type="number" id="payAmount" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" required>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Payment Date</label>
-                    <input type="date" id="payDate" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" required>
-                </div>
-                <div class="pt-2 flex justify-between space-x-2">
-                    <button type="button" onclick="markUnpaid()" class="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-3 py-2 rounded-lg text-sm font-medium">Mark as Unpaid</button>
-                    <div class="flex space-x-2">
-                        <button type="button" onclick="closePaymentModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium">Cancel</button>
-                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium">Confirm Payment</button>
+                <!-- Pending / Defaulters Card -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Pending Defaulters</p>
+                        <h3 id="statDefaultersCount" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+                        <p id="statDefaulterAmount" class="text-xs text-rose-600 font-medium mt-1">₹0 Pending</p>
+                    </div>
+                    <div class="p-3 bg-rose-50 rounded-xl text-rose-600">
+                        <i data-lucide="alert-circle" class="w-6 h-6"></i>
                     </div>
                 </div>
-            </form>
-        </div>
+
+                <!-- Guard Salary Paid Card -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Guard Payouts</p>
+                        <h3 id="statGuardPayout" class="text-2xl font-bold text-slate-800 mt-1">₹0</h3>
+                        <p id="statGuardStatus" class="text-xs text-slate-500 font-medium mt-1">0 Guard Payouts</p>
+                    </div>
+                    <div class="p-3 bg-blue-50 rounded-xl text-blue-600">
+                        <i data-lucide="user-check" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <!-- Net Balance Card -->
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Monthly Net Balance</p>
+                        <h3 id="statNetBalance" class="text-2xl font-bold text-slate-800 mt-1">₹0</h3>
+                        <p id="statCollectionRate" class="text-xs text-indigo-600 font-medium mt-1">0% Collection Rate</p>
+                    </div>
+                    <div class="p-3 bg-indigo-50 rounded-xl text-indigo-600">
+                        <i data-lucide="wallet" class="w-6 h-6"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 1: CONTRIBUTIONS -->
+            <section id="view-contributions" class="tab-content space-y-4">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <!-- Table Header Controls -->
+                    <div class="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <div class="relative w-full sm:w-64">
+                                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+                                <input type="text" id="searchHouse" oninput="renderContributions()" placeholder="Search House / Owner..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <select id="filterStatus" onchange="renderContributions()" class="bg-white border border-slate-300 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="ALL">All Status</option>
+                                <option value="PAID">Paid Only</option>
+                                <option value="UNPAID">Defaulters / Unpaid</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                            <button onclick="exportToCSV()" class="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i> Export Excel (CSV)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Contributions Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-100 text-slate-600 uppercase text-xs font-semibold tracking-wider border-b border-slate-200">
+                                <tr>
+                                    <th class="px-6 py-3">House No.</th>
+                                    <th class="px-6 py-3">Owner Name</th>
+                                    <th class="px-6 py-3">Status</th>
+                                    <th class="px-6 py-3">Amount (₹)</th>
+                                    <th class="px-6 py-3">Payment Date</th>
+                                    <th class="px-6 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contributionsTableBody" class="divide-y divide-slate-200">
+                                <!-- Dynamic Content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: GUARD SALARY PAYOUTS -->
+            <section id="view-guards" class="tab-content hidden space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div id="guardFormCard" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4 h-fit">
+                        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="plus-circle" class="w-5 h-5 text-indigo-600"></i> Record Guard Salary
+                        </h3>
+                        <div id="guardAdminAlert" class="hidden p-3 bg-amber-50 text-amber-800 text-xs rounded-lg border border-amber-200">
+                            Admin authorization required to add guard payouts.
+                        </div>
+                        <form id="guardForm" onsubmit="handleGuardPayout(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Guard Name</label>
+                                <input type="text" id="guardName" required placeholder="e.g. Ramesh Kumar" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Salary Amount (₹)</label>
+                                <input type="number" id="guardSalary" required placeholder="15000" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Payout Date</label>
+                                <input type="date" id="guardPayoutDate" required class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Notes / Remarks</label>
+                                <input type="text" id="guardNotes" placeholder="e.g., Paid via UPI" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                            <button type="submit" id="saveGuardBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm py-2 rounded-lg transition shadow-sm">
+                                Save Payout Record
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="md:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-4 bg-slate-50 border-b border-slate-200">
+                            <h3 class="text-base font-bold text-slate-800">Guard Payout History</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-100 text-slate-600 uppercase text-xs font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-6 py-3">Guard Name</th>
+                                        <th class="px-6 py-3">Payout Date</th>
+                                        <th class="px-6 py-3">Amount Paid</th>
+                                        <th class="px-6 py-3">Notes</th>
+                                        <th class="px-6 py-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="guardTableBody" class="divide-y divide-slate-200">
+                                    <!-- Dynamic Content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: MANAGE HOUSES -->
+            <section id="view-houses" class="tab-content hidden space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div id="houseFormCard" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4 h-fit">
+                        <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                            <i data-lucide="home" class="w-5 h-5 text-indigo-600"></i> Add Colony House
+                        </h3>
+                        <div id="houseAdminAlert" class="hidden p-3 bg-amber-50 text-amber-800 text-xs rounded-lg border border-amber-200">
+                            Admin authorization required to modify house directory.
+                        </div>
+                        <form id="houseForm" onsubmit="handleHouseSubmit(event)" class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">House Number (Alphanumeric)</label>
+                                <input type="text" id="houseNumber" required placeholder="e.g. A-101 or 45" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Owner Name</label>
+                                <input type="text" id="ownerName" required placeholder="e.g. Vikram Sharma" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Monthly Default Contribution (₹)</label>
+                                <input type="number" id="defaultAmount" required value="500" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                            <button type="submit" id="saveHouseBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm py-2 rounded-lg transition shadow-sm">
+                                Add House
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="md:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                            <h3 class="text-base font-bold text-slate-800">Colony Directory (<span id="totalHouseCount">0</span> Houses)</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-100 text-slate-600 uppercase text-xs font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-6 py-3">House No.</th>
+                                        <th class="px-6 py-3">Owner Name</th>
+                                        <th class="px-6 py-3">Fixed Amount</th>
+                                        <th class="px-6 py-3 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="houseTableBody" class="divide-y divide-slate-200">
+                                    <!-- Dynamic Content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto no-print">
+            Colony Security & Maintenance Tracking App &bull; Restricted View for Residents
+        </footer>
     </div>
 
-    <!-- MODAL: Guard & Payout Management Modal -->
-    <div id="guardModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-4">
-            <div class="flex items-center justify-between border-b pb-3">
-                <h3 class="font-bold text-slate-800 text-lg">Security Guard & Payout Log</h3>
-                <button onclick="closeGuardModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
+    <!-- RECEIPT MODAL -->
+    <div id="receiptModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-6 relative border border-slate-100">
+            <button onclick="closeReceipt()" class="absolute right-4 top-4 text-slate-400 hover:text-slate-600 no-print">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
             
-            <!-- Guard Details -->
-            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
-                <div class="flex justify-between items-center text-xs text-slate-500 font-semibold">
-                    <span>GUARD DETAILS</span>
-                    <span id="modalSelectedMonth" class="text-indigo-600">Oct 2026</span>
+            <div class="text-center space-y-1">
+                <div class="inline-flex p-3 bg-emerald-100 text-emerald-600 rounded-full mb-2">
+                    <i data-lucide="check-circle-2" class="w-8 h-8"></i>
                 </div>
-                <div class="grid grid-cols-2 gap-2 text-sm">
-                    <div><span class="text-xs text-slate-400">Name:</span> <strong id="guardNameDisplay" class="block text-slate-700">Ramesh Kumar</strong></div>
-                    <div><span class="text-xs text-slate-400">Monthly Salary:</span> <strong id="guardSalaryDisplay" class="block text-slate-700">₹10,000</strong></div>
+                <h2 class="text-xl font-bold text-slate-800">Maintenance Payment Receipt</h2>
+                <p class="text-xs text-slate-500">Colony Resident Association</p>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 text-sm">
+                <div class="flex justify-between py-1 border-b border-slate-200">
+                    <span class="text-slate-500">Receipt No:</span>
+                    <span id="recNo" class="font-mono font-bold text-slate-700">#REC-0000</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-slate-200">
+                    <span class="text-slate-500">House No:</span>
+                    <span id="recHouse" class="font-bold text-slate-800">---</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-slate-200">
+                    <span class="text-slate-500">Owner Name:</span>
+                    <span id="recOwner" class="font-semibold text-slate-800">---</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-slate-200">
+                    <span class="text-slate-500">Payment Month:</span>
+                    <span id="recMonth" class="font-semibold text-slate-800">---</span>
+                </div>
+                <div class="flex justify-between py-1 border-b border-slate-200">
+                    <span class="text-slate-500">Date Paid:</span>
+                    <span id="recDate" class="font-semibold text-slate-800">---</span>
+                </div>
+                <div class="flex justify-between py-1 text-base font-bold text-indigo-900 pt-1">
+                    <span>Amount Paid:</span>
+                    <span id="recAmount">₹0</span>
                 </div>
             </div>
 
-            <!-- Payout Status Banner -->
-            <div id="payoutBanner" class="p-3 rounded-lg border flex items-center justify-between">
-                <div>
-                    <div id="payoutStatusTitle" class="font-bold text-sm">Status: Pending</div>
-                    <div id="payoutStatusSub" class="text-xs">Salary for this month has not been paid yet.</div>
-                </div>
-                <button id="payoutActionBtn" onclick="toggleGuardPayout()" class="admin-only hidden px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition">
-                    Record Payout
+            <div class="flex gap-3 no-print">
+                <button onclick="window.print()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg text-sm flex items-center justify-center gap-2 transition">
+                    <i data-lucide="printer" class="w-4 h-4"></i> Print Receipt
+                </button>
+                <button onclick="closeReceipt()" class="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 rounded-lg text-sm transition">
+                    Close
                 </button>
             </div>
-
-            <!-- Guard Payout History -->
-            <div>
-                <h4 class="text-xs font-semibold text-slate-600 uppercase mb-2">Recent Payout Records</h4>
-                <div class="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 text-xs">
-                    <table class="w-full text-left">
-                        <thead class="bg-slate-50 text-slate-500">
-                            <tr>
-                                <th class="py-2 px-3">Month</th>
-                                <th class="py-2 px-3">Amount</th>
-                                <th class="py-2 px-3">Date Paid</th>
-                            </tr>
-                        </thead>
-                        <tbody id="payoutHistoryBody">
-                            <!-- Populated dynamically -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="pt-2 flex justify-end">
-                <button onclick="closeGuardModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium">Close</button>
-            </div>
         </div>
     </div>
 
-    <!-- PRINTABLE RECEIPT TEMPLATE (Hidden from normal UI) -->
-    <div id="printableReceipt" class="print-only p-8 max-w-md mx-auto border-2 border-slate-800 rounded-lg">
-        <div class="text-center border-b pb-4 mb-4">
-            <h2 id="receiptColonyName" class="text-xl font-bold uppercase">Greenwood Heights</h2>
-            <p class="text-xs text-slate-600">Monthly Maintenance Contribution Receipt</p>
-        </div>
-        <div class="space-y-3 text-sm">
-            <div class="flex justify-between">
-                <span class="text-slate-500">Receipt No:</span>
-                <span id="recNo" class="font-mono font-bold">#REC-001</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-slate-500">Date:</span>
-                <span id="recDate">2026-10-28</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-slate-500">House No:</span>
-                <span id="recHouseNo" class="font-bold">A-101</span>
-            </div>
-            <div class="flex justify-between">
-                <span class="text-slate-500">Resident Name:</span>
-                <span id="recOwner">Rajesh Sharma</span>
-            </div>
-            <div class="flex justify-between border-t pt-2">
-                <span class="text-slate-500">Month / Year:</span>
-                <span id="recMonth" class="font-semibold">October 2026</span>
-            </div>
-            <div class="flex justify-between border-t border-b py-2 text-base font-bold">
-                <span>Amount Paid:</span>
-                <span id="recAmount">₹500</span>
-            </div>
-        </div>
-        <div class="mt-8 text-xs text-center text-slate-500 italic">
-            Thank you for your contribution towards colony security & maintenance!
-        </div>
-    </div>
-
-    <!-- APPLICATION SCRIPT LOGIC -->
+    <!-- APPLICATION LOGIC -->
     <script>
-        // Default Initial Data
-        const DEFAULT_CONFIG = {
-            colonyName: "Greenwood Heights",
-            defaultAmount: 500,
-            guardName: "Ramesh Kumar (Guard)",
-            guardSalary: 10000,
-            adminPin: "1234"
-        };
+        const ACCESS_PASSCODE = "COLONY2026"; // Resident passcode
+        const ADMIN_PIN = "1234";              // Admin PIN
+        
+        let isAdmin = false;
+        let selectedMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
 
         const INITIAL_HOUSES = [
-            { id: "h1", houseNo: "A-101", owner: "Rajesh Sharma", contact: "9876543210" },
-            { id: "h2", houseNo: "A-102", owner: "Priya Verma", contact: "9876543211" },
-            { id: "h3", houseNo: "A-103", owner: "Amitabh Das", contact: "9876543212" },
-            { id: "h4", houseNo: "A-104", owner: "Sunita Reddy", contact: "9876543213" },
-            { id: "h5", houseNo: "A-105", owner: "Vikram Mehta", contact: "9876543214" },
-            { id: "h6", houseNo: "B-201", owner: "Sanjay Patel", contact: "9876543215" },
-            { id: "h7", houseNo: "B-202", owner: "Neha Kapoor", contact: "9876543216" },
-            { id: "h8", houseNo: "B-203", owner: "Karan Singh", contact: "9876543217" },
-            { id: "h9", houseNo: "B-204", owner: "Ananya Joshi", contact: "9876543218" },
-            { id: "h10", houseNo: "B-205", owner: "Deepak Rao", contact: "9876543219" },
-            { id: "h11", houseNo: "C-301", owner: "Rohan Nair", contact: "9876543220" },
-            { id: "h12", houseNo: "C-302", owner: "Meenakshi Iyer", contact: "9876543221" },
-            { id: "h13", houseNo: "C-303", owner: "Gaurav Malhotra", contact: "9876543222" },
-            { id: "h14", houseNo: "C-304", owner: "Pooja Hegde", contact: "9876543223" },
-            { id: "h15", houseNo: "C-305", owner: "Suresh Menon", contact: "9876543224" }
+            { id: "h1", number: "A-101", owner: "Rajesh Sharma", amount: 500 },
+            { id: "h2", number: "A-102", owner: "Priya Patel", amount: 500 },
+            { id: "h3", number: "A-103", owner: "Amitabh Verma", amount: 600 },
+            { id: "h4", number: "B-201", owner: "Suresh Menon", amount: 500 },
+            { id: "h5", number: "B-202", owner: "Kavita Reddy", amount: 500 },
+            { id: "h6", number: "B-203", owner: "Sunil Joshi", amount: 500 },
+            { id: "h7", number: "C-301", owner: "Ananya Roy", amount: 500 },
+            { id: "h8", number: "C-302", owner: "Vikram Singh", amount: 500 }
         ];
 
-        // State variables
-        let appConfig = JSON.parse(localStorage.getItem('colony_config')) || DEFAULT_CONFIG;
         let houses = JSON.parse(localStorage.getItem('colony_houses')) || INITIAL_HOUSES;
-        let payments = JSON.parse(localStorage.getItem('colony_payments')) || {}; // Key: "YYYY-MM" -> { houseId: { paid: bool, date: string, amount: number } }
-        let guardPayouts = JSON.parse(localStorage.getItem('colony_guard_payouts')) || {}; // Key: "YYYY-MM" -> { paid: bool, date: string, amount: number }
+        let payments = JSON.parse(localStorage.getItem('colony_payments')) || {};
+        let guardPayouts = JSON.parse(localStorage.getItem('colony_guards')) || {};
 
-        let isAdmin = false;
-        let currentFilter = 'all';
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            checkExistingSession();
+        });
 
-        // Initialize App on Load
-        window.onload = function() {
-            // Set current month picker to current date (e.g., Oct 2026)
-            const today = new Date();
-            const currentYearMonth = today.toISOString().slice(0, 7);
-            document.getElementById('monthPicker').value = currentYearMonth;
-
-            // Seed sample payments if completely empty
-            if (Object.keys(payments).length === 0) {
-                seedSamplePayments(currentYearMonth);
+        // Passcode Lock Logic
+        function checkExistingSession() {
+            const unlocked = localStorage.getItem('colony_unlocked');
+            if (unlocked === 'true') {
+                showApp();
+            } else {
+                document.getElementById('accessLockScreen').classList.remove('hidden');
             }
+        }
 
-            // Month Picker Event Listener
-            document.getElementById('monthPicker').addEventListener('change', renderApp);
+        function verifyAccessPasscode(e) {
+            e.preventDefault();
+            const entered = document.getElementById('inputPasscode').value;
+            if (entered === ACCESS_PASSCODE) {
+                localStorage.setItem('colony_unlocked', 'true');
+                document.getElementById('passcodeError').classList.add('hidden');
+                showApp();
+            } else {
+                document.getElementById('passcodeError').classList.remove('hidden');
+            }
+        }
 
-            renderApp();
-        };
+        function showApp() {
+            document.getElementById('accessLockScreen').classList.add('hidden');
+            document.getElementById('appContainer').classList.remove('hidden');
+            document.getElementById('monthPicker').value = selectedMonth;
+            updateAdminUI();
+            renderAll();
+        }
 
-        function seedSamplePayments(yearMonth) {
-            payments[yearMonth] = {};
-            // Mark first 8 houses as paid for demo
-            houses.forEach((h, index) => {
-                if (index < 8) {
-                    payments[yearMonth][h.id] = {
-                        paid: true,
-                        date: new Date().toISOString().slice(0, 10),
-                        amount: appConfig.defaultAmount
-                    };
-                }
-            });
-            saveData();
+        function lockApp() {
+            localStorage.removeItem('colony_unlocked');
+            isAdmin = false;
+            document.getElementById('appContainer').classList.add('hidden');
+            document.getElementById('accessLockScreen').classList.remove('hidden');
+            document.getElementById('inputPasscode').value = '';
         }
 
         function saveData() {
-            localStorage.setItem('colony_config', JSON.stringify(appConfig));
             localStorage.setItem('colony_houses', JSON.stringify(houses));
             localStorage.setItem('colony_payments', JSON.stringify(payments));
-            localStorage.setItem('colony_guard_payouts', JSON.stringify(guardPayouts));
+            localStorage.setItem('colony_guards', JSON.stringify(guardPayouts));
+            renderAll();
         }
 
-        // Main Render Function
-        function renderApp() {
-            const currentMonth = document.getElementById('monthPicker').value;
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const monthPayments = payments[currentMonth] || {};
-
-            // 1. Update Title Header
-            document.querySelector('header h1').innerText = appConfig.colonyName;
-
-            // 2. Filter Houses
-            let filtered = houses.filter(h => {
-                const matchesSearch = h.houseNo.toLowerCase().includes(searchTerm) || h.owner.toLowerCase().includes(searchTerm);
-                const isPaid = monthPayments[h.id] && monthPayments[h.id].paid;
-                
-                if (currentFilter === 'paid') return matchesSearch && isPaid;
-                if (currentFilter === 'unpaid') return matchesSearch && !isPaid;
-                return matchesSearch;
-            });
-
-            // 3. Render Table Rows
-            const tbody = document.getElementById('houseTableBody');
-            tbody.innerHTML = '';
-
-            if (filtered.length === 0) {
-                document.getElementById('emptyState').classList.remove('hidden');
-            } else {
-                document.getElementById('emptyState').classList.add('hidden');
-                
-                filtered.forEach(h => {
-                    const payInfo = monthPayments[h.id] || { paid: false, amount: appConfig.defaultAmount, date: '-' };
-                    const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-slate-50 border-b border-slate-100 transition';
-                    
-                    tr.innerHTML = `
-                        <td class="py-3 px-4 font-semibold text-slate-800">${h.houseNo}</td>
-                        <td class="py-3 px-4">${h.owner}</td>
-                        <td class="py-3 px-4 text-slate-500 text-xs">${h.contact || 'N/A'}</td>
-                        <td class="py-3 px-4">
-                            ${payInfo.paid 
-                                ? `<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
-                                    <i class="fa-solid fa-circle-check text-[10px]"></i> Paid
-                                   </span>`
-                                : `<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 border border-amber-200 inline-flex items-center gap-1">
-                                    <i class="fa-solid fa-clock text-[10px]"></i> Unpaid
-                                   </span>`
-                            }
-                        </td>
-                        <td class="py-3 px-4 font-medium text-slate-700">₹${payInfo.paid ? payInfo.amount : appConfig.defaultAmount}</td>
-                        <td class="py-3 px-4 text-xs text-slate-500">${payInfo.paid ? payInfo.date : '-'}</td>
-                        <td class="py-3 px-4 text-right space-x-2 no-print">
-                            ${payInfo.paid 
-                                ? `<button onclick="printReceipt('${h.id}')" title="Print Receipt" class="text-slate-500 hover:text-indigo-600 px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-xs">
-                                    <i class="fa-solid fa-print"></i> Receipt
-                                   </button>` 
-                                : ''
-                            }
-                            ${isAdmin ? `
-                                <button onclick="openPaymentModal('${h.id}')" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-md text-xs font-medium border border-indigo-200">
-                                    ${payInfo.paid ? 'Edit Status' : 'Mark Paid'}
-                                </button>
-                                <button onclick="openHouseModal('${h.id}')" class="text-slate-400 hover:text-slate-700 px-1">
-                                    <i class="fa-solid fa-pen-to-square"></i>
-                                </button>
-                            ` : ''}
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            }
-
-            // 4. Update Summary Cards
-            const totalHouses = houses.length;
-            const targetCollection = totalHouses * appConfig.defaultAmount;
-            
-            let totalCollected = 0;
-            let paidCount = 0;
-
-            houses.forEach(h => {
-                if (monthPayments[h.id] && monthPayments[h.id].paid) {
-                    totalCollected += (monthPayments[h.id].amount || appConfig.defaultAmount);
-                    paidCount++;
-                }
-            });
-
-            const unpaidCount = totalHouses - paidCount;
-            const pendingAmount = targetCollection - totalCollected;
-            const progressPct = targetCollection > 0 ? Math.round((totalCollected / targetCollection) * 100) : 0;
-
-            document.getElementById('cardTarget').innerText = `₹${targetCollection.toLocaleString()}`;
-            document.getElementById('cardTotalHouses').innerText = `For ${totalHouses} registered houses`;
-            
-            document.getElementById('cardCollected').innerText = `₹${totalCollected.toLocaleString()}`;
-            document.getElementById('progressBar').style.width = `${progressPct}%`;
-
-            document.getElementById('cardUnpaidCount').innerText = `${unpaidCount} Houses`;
-            document.getElementById('cardPendingAmount').innerText = `₹${pendingAmount.toLocaleString()} overdue`;
-
-            // Guard Salary Status
-            const guardPayout = guardPayouts[currentMonth];
-            const isGuardPaid = guardPayout && guardPayout.paid;
-            const guardStatusEl = document.getElementById('cardGuardStatus');
-            
-            if (isGuardPaid) {
-                guardStatusEl.innerHTML = `<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    <i class="fa-solid fa-check"></i> Paid (₹${guardPayout.amount})
-                </span>`;
-            } else {
-                guardStatusEl.innerHTML = `<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                    Pending (₹${appConfig.guardSalary})
-                </span>`;
-            }
-
-            // Net Balance
-            const guardExpenses = isGuardPaid ? guardPayout.amount : 0;
-            const netBalance = totalCollected - guardExpenses;
-            document.getElementById('cardNetBalance').innerText = `₹${netBalance.toLocaleString()}`;
-            document.getElementById('cardNetBalance').className = `text-xl font-bold ${netBalance >= 0 ? 'text-indigo-700' : 'text-red-600'}`;
-
-            // 5. Manage Role Elements Visibility
-            document.querySelectorAll('.admin-only').forEach(el => {
-                if (isAdmin) el.classList.remove('hidden');
-                else el.classList.add('hidden');
-            });
-        }
-
-        // Role & Auth Handling
-        function handleRoleToggle() {
+        function handleAdminAuthToggle() {
             if (isAdmin) {
                 isAdmin = false;
-                updateRoleUI();
+                updateAdminUI();
             } else {
-                document.getElementById('pinInput').value = '';
-                document.getElementById('pinModal').classList.remove('hidden');
-                document.getElementById('pinInput').focus();
+                const pin = prompt("Enter Admin PIN (Default: 1234):");
+                if (pin === ADMIN_PIN) {
+                    isAdmin = true;
+                    updateAdminUI();
+                } else if (pin !== null) {
+                    alert("Incorrect PIN. Access Denied.");
+                }
             }
         }
 
-        function verifyPin() {
-            const pin = document.getElementById('pinInput').value;
-            if (pin === appConfig.adminPin) {
-                isAdmin = true;
-                closePinModal();
-                updateRoleUI();
-            } else {
-                alert('Invalid Security PIN! Default PIN is 1234');
-            }
-        }
-
-        function closePinModal() {
-            document.getElementById('pinModal').classList.add('hidden');
-        }
-
-        function updateRoleUI() {
+        function updateAdminUI() {
             const roleBadge = document.getElementById('roleBadge');
+            const roleLabel = document.getElementById('roleLabel');
             const adminBtnText = document.getElementById('adminBtnText');
-
+            
             if (isAdmin) {
-                roleBadge.className = "px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-400 text-slate-900 flex items-center gap-1";
-                roleBadge.innerHTML = `<i class="fa-solid fa-user-gear text-[10px]"></i> Admin Mode`;
-                adminBtnText.innerText = "Exit Admin Mode";
+                roleBadge.className = "inline-block w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse";
+                roleLabel.textContent = "Admin Mode (Editing)";
+                adminBtnText.textContent = "Logout Admin";
             } else {
-                roleBadge.className = "px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-500 text-white flex items-center gap-1";
-                roleBadge.innerHTML = `<i class="fa-solid fa-eye text-[10px]"></i> Resident View`;
-                adminBtnText.innerText = "Admin Login";
+                roleBadge.className = "inline-block w-2.5 h-2.5 rounded-full bg-emerald-400";
+                roleLabel.textContent = "Resident View";
+                adminBtnText.textContent = "Admin Login";
             }
-            renderApp();
+
+            document.getElementById('guardAdminAlert').classList.toggle('hidden', isAdmin);
+            document.getElementById('guardForm').querySelectorAll('input, button').forEach(el => el.disabled = !isAdmin);
+            
+            document.getElementById('houseAdminAlert').classList.toggle('hidden', isAdmin);
+            document.getElementById('houseForm').querySelectorAll('input, button').forEach(el => el.disabled = !isAdmin);
+
+            renderAll();
         }
 
-        // Filter Controls
-        function setFilter(filterType) {
-            currentFilter = filterType;
-            document.querySelectorAll('.filter-tab').forEach(btn => {
-                btn.className = "filter-tab px-3 py-1.5 rounded-md transition text-slate-600 hover:text-slate-900";
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'shadow-sm', 'text-slate-700');
+                btn.classList.add('text-slate-500');
             });
+
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            activeBtn.classList.add('bg-white', 'shadow-sm', 'text-slate-700');
+            activeBtn.classList.remove('text-slate-500');
+        }
+
+        function changeMonth() {
+            selectedMonth = document.getElementById('monthPicker').value;
+            renderAll();
+        }
+
+        function renderAll() {
+            renderContributions();
+            renderGuardPayouts();
+            renderHouses();
+            updateSummaryCards();
+            lucide.createIcons();
+        }
+
+        function renderContributions() {
+            const tbody = document.getElementById('contributionsTableBody');
+            const searchQuery = document.getElementById('searchHouse').value.toLowerCase();
+            const filterStatus = document.getElementById('filterStatus').value;
+
+            tbody.innerHTML = '';
+            const currentMonthPayments = payments[selectedMonth] || {};
+
+            houses.forEach(house => {
+                const payRecord = currentMonthPayments[house.id] || { paid: false, date: '', amount: house.amount };
+                
+                const matchesSearch = house.number.toLowerCase().includes(searchQuery) || house.owner.toLowerCase().includes(searchQuery);
+                const matchesStatus = filterStatus === 'ALL' || 
+                                     (filterStatus === 'PAID' && payRecord.paid) || 
+                                     (filterStatus === 'UNPAID' && !payRecord.paid);
+
+                if (!matchesSearch || !matchesStatus) return;
+
+                const tr = document.createElement('tr');
+                tr.className = payRecord.paid ? "bg-white hover:bg-slate-50" : "bg-rose-50/30 hover:bg-rose-50/50";
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-bold text-slate-800">${house.number}</td>
+                    <td class="px-6 py-4 text-slate-700">${house.owner}</td>
+                    <td class="px-6 py-4">
+                        ${payRecord.paid 
+                            ? `<span class="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-semibold">
+                                <i data-lucide="check" class="w-3 h-3"></i> Paid
+                               </span>` 
+                            : `<span class="inline-flex items-center gap-1 bg-rose-100 text-rose-800 text-xs px-2.5 py-1 rounded-full font-semibold">
+                                <i data-lucide="clock" class="w-3 h-3"></i> Pending
+                               </span>`
+                        }
+                    </td>
+                    <td class="px-6 py-4 font-semibold text-slate-800">
+                        ₹${payRecord.amount || house.amount}
+                    </td>
+                    <td class="px-6 py-4 text-xs text-slate-500">${payRecord.date || '---'}</td>
+                    <td class="px-6 py-4 text-right space-x-2">
+                        ${isAdmin ? `
+                            <button onclick="togglePayment('${house.id}')" class="text-xs px-3 py-1 rounded-md font-semibold transition ${payRecord.paid ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' : 'bg-emerald-600 text-white hover:bg-emerald-700'}">
+                                ${payRecord.paid ? 'Mark Unpaid' : 'Mark Paid'}
+                            </button>
+                        ` : ''}
+                        ${payRecord.paid ? `
+                            <button onclick="showReceipt('${house.id}')" class="text-xs px-2.5 py-1 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-md font-medium inline-flex items-center gap-1">
+                                <i data-lucide="receipt" class="w-3.5 h-3.5"></i> Receipt
+                            </button>
+                        ` : ''}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function togglePayment(houseId) {
+            if (!isAdmin) return;
+            if (!payments[selectedMonth]) payments[selectedMonth] = {};
             
-            if (filterType === 'all') document.getElementById('tabAll').className = "filter-tab px-3 py-1.5 rounded-md transition shadow-sm bg-white text-indigo-700 font-semibold";
-            if (filterType === 'paid') document.getElementById('tabPaid').className = "filter-tab px-3 py-1.5 rounded-md transition shadow-sm bg-white text-emerald-700 font-semibold";
-            if (filterType === 'unpaid') document.getElementById('tabUnpaid').className = "filter-tab px-3 py-1.5 rounded-md transition shadow-sm bg-white text-amber-700 font-semibold";
-
-            renderApp();
-        }
-
-        // House Management Modals
-        function openHouseModal(houseId = null) {
-            document.getElementById('houseForm').reset();
-            document.getElementById('editingHouseId').value = '';
-            
-            if (houseId) {
-                const house = houses.find(h => h.id === houseId);
-                if (house) {
-                    document.getElementById('houseModalTitle').innerText = "Edit House Details";
-                    document.getElementById('editingHouseId').value = house.id;
-                    document.getElementById('houseNoInput').value = house.houseNo;
-                    document.getElementById('ownerNameInput').value = house.owner;
-                    document.getElementById('contactInput').value = house.contact || '';
-                    document.getElementById('deleteHouseBtn').classList.remove('hidden');
-                }
-            } else {
-                document.getElementById('houseModalTitle').innerText = "Add New House";
-                document.getElementById('deleteHouseBtn').classList.add('hidden');
-            }
-            document.getElementById('houseModal').classList.remove('hidden');
-        }
-
-        function closeHouseModal() {
-            document.getElementById('houseModal').classList.add('hidden');
-        }
-
-        function saveHouse(e) {
-            e.preventDefault();
-            const id = document.getElementById('editingHouseId').value;
-            const houseNo = document.getElementById('houseNoInput').value.trim();
-            const owner = document.getElementById('ownerNameInput').value.trim();
-            const contact = document.getElementById('contactInput').value.trim();
-
-            if (id) {
-                const house = houses.find(h => h.id === id);
-                if (house) {
-                    house.houseNo = houseNo;
-                    house.owner = owner;
-                    house.contact = contact;
-                }
-            } else {
-                const newHouse = {
-                    id: 'h_' + Date.now(),
-                    houseNo,
-                    owner,
-                    contact
-                };
-                houses.push(newHouse);
-            }
-
-            saveData();
-            closeHouseModal();
-            renderApp();
-        }
-
-        function deleteHouse() {
-            const id = document.getElementById('editingHouseId').value;
-            if (id && confirm('Are you sure you want to delete this house entry?')) {
-                houses = houses.filter(h => h.id !== id);
-                saveData();
-                closeHouseModal();
-                renderApp();
-            }
-        }
-
-        // Payment Processing Modals
-        function openPaymentModal(houseId) {
             const house = houses.find(h => h.id === houseId);
-            const currentMonth = document.getElementById('monthPicker').value;
-            const monthPayments = payments[currentMonth] || {};
-            const existing = monthPayments[houseId] || {};
+            const current = payments[selectedMonth][houseId] || { paid: false };
 
-            document.getElementById('payHouseId').value = houseId;
-            document.getElementById('paymentSubTitle').innerText = `House: ${house.houseNo} (${house.owner})`;
-            document.getElementById('payAmount').value = existing.amount || appConfig.defaultAmount;
-            document.getElementById('payDate').value = existing.date || new Date().toISOString().slice(0, 10);
-
-            document.getElementById('paymentModal').classList.remove('hidden');
-        }
-
-        function closePaymentModal() {
-            document.getElementById('paymentModal').classList.add('hidden');
-        }
-
-        function savePayment(e) {
-            e.preventDefault();
-            const houseId = document.getElementById('payHouseId').value;
-            const amount = parseFloat(document.getElementById('payAmount').value);
-            const date = document.getElementById('payDate').value;
-            const currentMonth = document.getElementById('monthPicker').value;
-
-            if (!payments[currentMonth]) payments[currentMonth] = {};
-
-            payments[currentMonth][houseId] = {
-                paid: true,
-                amount: amount,
-                date: date
+            payments[selectedMonth][houseId] = {
+                paid: !current.paid,
+                date: !current.paid ? new Date().toISOString().split('T')[0] : '',
+                amount: house.amount
             };
 
             saveData();
-            closePaymentModal();
-            renderApp();
         }
 
-        function markUnpaid() {
-            const houseId = document.getElementById('payHouseId').value;
-            const currentMonth = document.getElementById('monthPicker').value;
+        function renderGuardPayouts() {
+            const tbody = document.getElementById('guardTableBody');
+            tbody.innerHTML = '';
+            
+            const monthGuards = guardPayouts[selectedMonth] || [];
 
-            if (payments[currentMonth] && payments[currentMonth][houseId]) {
-                payments[currentMonth][houseId].paid = false;
+            if (monthGuards.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">No guard payouts recorded for this month.</td></tr>`;
+                return;
+            }
+
+            monthGuards.forEach((g, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-semibold text-slate-800">${g.name}</td>
+                    <td class="px-6 py-4 text-slate-600">${g.date}</td>
+                    <td class="px-6 py-4 font-bold text-slate-800">₹${g.salary}</td>
+                    <td class="px-6 py-4 text-xs text-slate-500">${g.notes || '-'}</td>
+                    <td class="px-6 py-4 text-right">
+                        ${isAdmin ? `
+                            <button onclick="deleteGuardPayout(${idx})" class="text-rose-600 hover:text-rose-800">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        ` : '<span class="text-xs text-slate-300">Locked</span>'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function handleGuardPayout(e) {
+            e.preventDefault();
+            if (!isAdmin) return;
+
+            const name = document.getElementById('guardName').value;
+            const salary = parseFloat(document.getElementById('guardSalary').value);
+            const date = document.getElementById('guardPayoutDate').value;
+            const notes = document.getElementById('guardNotes').value;
+
+            if (!guardPayouts[selectedMonth]) guardPayouts[selectedMonth] = [];
+
+            guardPayouts[selectedMonth].push({ name, salary, date, notes });
+            document.getElementById('guardForm').reset();
+            saveData();
+        }
+
+        function deleteGuardPayout(index) {
+            if (!isAdmin) return;
+            guardPayouts[selectedMonth].splice(index, 1);
+            saveData();
+        }
+
+        function renderHouses() {
+            const tbody = document.getElementById('houseTableBody');
+            document.getElementById('totalHouseCount').textContent = houses.length;
+            tbody.innerHTML = '';
+
+            houses.forEach(house => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-bold text-slate-800">${house.number}</td>
+                    <td class="px-6 py-4 text-slate-700">${house.owner}</td>
+                    <td class="px-6 py-4 font-semibold text-slate-800">₹${house.amount}</td>
+                    <td class="px-6 py-4 text-right">
+                        ${isAdmin ? `
+                            <button onclick="deleteHouse('${house.id}')" class="text-rose-600 hover:text-rose-800">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        ` : '<span class="text-xs text-slate-300">Locked</span>'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function handleHouseSubmit(e) {
+            e.preventDefault();
+            if (!isAdmin) return;
+
+            const number = document.getElementById('houseNumber').value.trim();
+            const owner = document.getElementById('ownerName').value.trim();
+            const amount = parseFloat(document.getElementById('defaultAmount').value);
+
+            const newHouse = { id: 'h' + Date.now(), number, owner, amount };
+            houses.push(newHouse);
+            
+            document.getElementById('houseForm').reset();
+            saveData();
+        }
+
+        function deleteHouse(id) {
+            if (!isAdmin) return;
+            if (confirm("Are you sure you want to delete this house?")) {
+                houses = houses.filter(h => h.id !== id);
                 saveData();
             }
-            closePaymentModal();
-            renderApp();
         }
 
-        // Guard Salary Modal
-        function openGuardModal() {
-            const currentMonth = document.getElementById('monthPicker').value;
-            document.getElementById('modalSelectedMonth').innerText = currentMonth;
-            document.getElementById('guardNameDisplay').innerText = appConfig.guardName;
-            document.getElementById('guardSalaryDisplay').innerText = `₹${appConfig.guardSalary.toLocaleString()}`;
+        function updateSummaryCards() {
+            const currentMonthPayments = payments[selectedMonth] || {};
+            const monthGuards = guardPayouts[selectedMonth] || [];
 
-            const payout = guardPayouts[currentMonth];
-            const banner = document.getElementById('payoutBanner');
-            const actionBtn = document.getElementById('payoutActionBtn');
+            let totalCollected = 0;
+            let paidCount = 0;
+            let defaultersCount = 0;
+            let totalPendingAmount = 0;
 
-            if (payout && payout.paid) {
-                banner.className = "p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-900 flex items-center justify-between";
-                document.getElementById('payoutStatusTitle').innerText = "Status: Paid";
-                document.getElementById('payoutStatusSub').innerText = `Paid ₹${payout.amount} on ${payout.date}`;
-                actionBtn.innerText = "Cancel / Mark Unpaid";
-                actionBtn.className = "admin-only px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-100";
-            } else {
-                banner.className = "p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 flex items-center justify-between";
-                document.getElementById('payoutStatusTitle').innerText = "Status: Pending";
-                document.getElementById('payoutStatusSub').innerText = "Salary for this month has not been logged yet.";
-                actionBtn.innerText = "Record Payout";
-                actionBtn.className = "admin-only px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700";
-            }
-
-            // Populate History
-            const histBody = document.getElementById('payoutHistoryBody');
-            histBody.innerHTML = '';
-            
-            Object.keys(guardPayouts).sort().reverse().forEach(m => {
-                if (guardPayouts[m].paid) {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = `
-                        <td class="py-2 px-3 font-semibold text-slate-700">${m}</td>
-                        <td class="py-2 px-3 text-emerald-600 font-medium">₹${guardPayouts[m].amount}</td>
-                        <td class="py-2 px-3 text-slate-500">${guardPayouts[m].date}</td>
-                    `;
-                    histBody.appendChild(tr);
+            houses.forEach(h => {
+                const record = currentMonthPayments[h.id];
+                if (record && record.paid) {
+                    totalCollected += parseFloat(record.amount || h.amount);
+                    paidCount++;
+                } else {
+                    defaultersCount++;
+                    totalPendingAmount += parseFloat(h.amount);
                 }
             });
 
-            if (histBody.children.length === 0) {
-                histBody.innerHTML = `<tr><td colspan="3" class="py-3 px-3 text-center text-slate-400">No payout records found.</td></tr>`;
-            }
+            const totalGuardPayout = monthGuards.reduce((sum, g) => sum + parseFloat(g.salary), 0);
+            const netBalance = totalCollected - totalGuardPayout;
+            const collectionRate = houses.length > 0 ? Math.round((paidCount / houses.length) * 100) : 0;
 
-            document.getElementById('guardModal').classList.remove('hidden');
-        }
-
-        function closeGuardModal() {
-            document.getElementById('guardModal').classList.add('hidden');
-        }
-
-        function toggleGuardPayout() {
-            const currentMonth = document.getElementById('monthPicker').value;
-            const payout = guardPayouts[currentMonth];
-
-            if (payout && payout.paid) {
-                guardPayouts[currentMonth].paid = false;
-            } else {
-                guardPayouts[currentMonth] = {
-                    paid: true,
-                    amount: appConfig.guardSalary,
-                    date: new Date().toISOString().slice(0, 10)
-                };
-            }
-
-            saveData();
-            openGuardModal();
-            renderApp();
-        }
-
-        // Colony Config Modal
-        function openConfigModal() {
-            document.getElementById('cfgColonyName').value = appConfig.colonyName;
-            document.getElementById('cfgDefaultAmount').value = appConfig.defaultAmount;
-            document.getElementById('cfgGuardSalary').value = appConfig.guardSalary;
-            document.getElementById('cfgAdminPin').value = appConfig.adminPin;
-
-            document.getElementById('configModal').classList.remove('hidden');
-        }
-
-        function closeConfigModal() {
-            document.getElementById('configModal').classList.add('hidden');
-        }
-
-        function saveConfig(e) {
-            e.preventDefault();
-            appConfig.colonyName = document.getElementById('cfgColonyName').value.trim();
-            appConfig.defaultAmount = parseFloat(document.getElementById('cfgDefaultAmount').value);
-            appConfig.guardSalary = parseFloat(document.getElementById('cfgGuardSalary').value);
-            appConfig.adminPin = document.getElementById('cfgAdminPin').value.trim();
-
-            saveData();
-            closeConfigModal();
-            renderApp();
-        }
-
-        // Excel / CSV Export Function
-        function exportToCSV() {
-            const currentMonth = document.getElementById('monthPicker').value;
-            const monthPayments = payments[currentMonth] || {};
+            document.getElementById('statTotalCollected').textContent = `₹${totalCollected.toLocaleString('en-IN')}`;
+            document.getElementById('statPaidCount').textContent = `${paidCount} of ${houses.length} Houses Paid`;
             
-            let csvContent = "data:text/csv;charset=utf-8,";
-            csvContent += `Colony Security Maintenance Report - ${currentMonth}\n`;
-            csvContent += "House No,Owner Name,Contact,Status,Amount Paid,Payment Date\n";
+            document.getElementById('statDefaultersCount').textContent = defaultersCount;
+            document.getElementById('statDefaulterAmount').textContent = `₹${totalPendingAmount.toLocaleString('en-IN')} Pending`;
+
+            document.getElementById('statGuardPayout').textContent = `₹${totalGuardPayout.toLocaleString('en-IN')}`;
+            document.getElementById('statGuardStatus').textContent = `${monthGuards.length} Guard Payouts`;
+
+            document.getElementById('statNetBalance').textContent = `₹${netBalance.toLocaleString('en-IN')}`;
+            document.getElementById('statCollectionRate').textContent = `${collectionRate}% Collection Rate`;
+        }
+
+        function showReceipt(houseId) {
+            const house = houses.find(h => h.id === houseId);
+            const record = (payments[selectedMonth] || {})[houseId];
+
+            if (!record || !record.paid) return;
+
+            document.getElementById('recNo').textContent = `#REC-${selectedMonth.replace('-','')}-${house.number}`;
+            document.getElementById('recHouse').textContent = house.number;
+            document.getElementById('recOwner').textContent = house.owner;
+            document.getElementById('recMonth').textContent = selectedMonth;
+            document.getElementById('recDate').textContent = record.date;
+            document.getElementById('recAmount').textContent = `₹${record.amount || house.amount}`;
+
+            document.getElementById('receiptModal').classList.remove('hidden');
+            document.getElementById('receiptModal').classList.add('flex');
+        }
+
+        function closeReceipt() {
+            document.getElementById('receiptModal').classList.add('hidden');
+            document.getElementById('receiptModal').classList.remove('flex');
+        }
+
+        function exportToCSV() {
+            let csv = 'House Number,Owner Name,Status,Amount Paid,Payment Date\n';
+            const currentMonthPayments = payments[selectedMonth] || {};
 
             houses.forEach(h => {
-                const payInfo = monthPayments[h.id] || { paid: false, amount: appConfig.defaultAmount, date: '-' };
-                const status = payInfo.paid ? "Paid" : "Unpaid";
-                const amount = payInfo.paid ? payInfo.amount : 0;
-                const date = payInfo.paid ? payInfo.date : "-";
-                
-                csvContent += `"${h.houseNo}","${h.owner}","${h.contact || ''}","${status}",${amount},"${date}"\n`;
+                const rec = currentMonthPayments[h.id] || { paid: false, date: '', amount: h.amount };
+                const status = rec.paid ? 'PAID' : 'UNPAID';
+                const amt = rec.paid ? (rec.amount || h.amount) : 0;
+                csv += `"${h.number}","${h.owner}","${status}",${amt},"${rec.date}"\n`;
             });
 
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `Security_Maintenance_${currentMonth}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // Printable Receipt Generation
-        function printReceipt(houseId) {
-            const house = houses.find(h => h.id === houseId);
-            const currentMonth = document.getElementById('monthPicker').value;
-            const payInfo = (payments[currentMonth] || {})[houseId] || {};
-
-            document.getElementById('receiptColonyName').innerText = appConfig.colonyName;
-            document.getElementById('recNo').innerText = `#REC-${Math.floor(1000 + Math.random() * 9000)}`;
-            document.getElementById('recDate').innerText = payInfo.date || new Date().toISOString().slice(0, 10);
-            document.getElementById('recHouseNo').innerText = house.houseNo;
-            document.getElementById('recOwner').innerText = house.owner;
-            document.getElementById('recMonth').innerText = currentMonth;
-            document.getElementById('recAmount').innerText = `₹${payInfo.amount || appConfig.defaultAmount}`;
-
-            window.print();
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `Colony_Maintenance_${selectedMonth}.csv`);
+            a.click();
         }
     </script>
 </body>
